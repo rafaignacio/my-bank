@@ -1,68 +1,77 @@
 use super::BankAccount;
-use std::num::ParseIntError;
-
-#[derive(Debug)]
-pub enum CustomError {
-    ConversionError(ParseIntError),
-    OtherError,
-}
-
 #[derive(Debug)]
 pub struct InvalidIbanError;
 
-pub fn is_iban_valid(account: &BankAccount) -> Result<bool, InvalidIbanError> {
-    if account.country_code.len() != 2 || 
-        account.bank_code.len() != 4 ||
-        account.branch_code.len() != 4 || 
-        account.account_number.len() != 12 ||
-        (account.control == 0 || account.control > 99) {
+pub fn is_iban_valid(account: &BankAccount) -> Result<(), InvalidIbanError> {
+    if account.country_code.len() != 2
+        || account.bank_code.len() != 4
+        || account.branch_code.len() != 4
+        || account.account_number.len() != 12
+        || (account.control == 0 || account.control > 99)
+    {
         return Err(InvalidIbanError);
     }
 
     let number = convert_into_97_10_u128(&account.iban_into_str());
 
-    Ok(
-        number % 97 == 1
-    )
+    if number % 97 == 1 {
+        Ok(())
+    } else {
+        Err(InvalidIbanError)
+    }
 }
 
 fn convert_into_97_10_u128(iban_str: &str) -> u128 {
     let iban = &(iban_str[4..].to_owned() + &iban_str[..4])
         .trim()
-        .replace(" ", "");
-    let converted_iban: String = iban.chars().map(|c| {
-        if c.is_ascii_alphabetic() {
-            let code = c as u8 - 55;
-            code.to_string()
-        } else {
-            c.to_string()
-        }
-    }).collect();
+        .replace(' ', "");
+    let converted_iban: String = iban
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphabetic() {
+                let code = c as u8 - 55;
+                code.to_string()
+            } else {
+                c.to_string()
+            }
+        })
+        .collect();
 
     converted_iban.parse::<u128>().unwrap()
 }
 
 impl BankAccount {
     pub fn iban_into_str(&self) -> String {
-        format!("{}{:02} {} {} {}", self.country_code, self.control, self.bank_code, self.branch_code,
-            format_account_number(self.account_number.as_str()))
+        format!(
+            "{}{:02} {} {} {}",
+            self.country_code,
+            self.control,
+            self.bank_code,
+            self.branch_code,
+            format_account_number(&self.account_number)
+        )
     }
 }
 
 fn format_account_number(account_number: &str) -> String {
-    format!("{} {} {}", &account_number[..4], &account_number[4..8], &account_number[8..])
+    format!(
+        "{} {} {}",
+        &account_number[..4],
+        &account_number[4..8],
+        &account_number[8..]
+    )
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{convert_into_97_10_u128, is_iban_valid};
     use crate::accounts::BankAccount;
-    use super::{is_iban_valid, convert_into_97_10_u128};
 
-    const VALID_IBAN : &str = "ES91 2100 0418 4502 0005 1332";
+    const VALID_IBAN: &str = "ES91 2100 0418 4502 0005 1332";
 
     #[test]
     fn should_create_account_from_iban_str() {
-        let result : BankAccount = VALID_IBAN.into();
+        let result: BankAccount = VALID_IBAN.into();
 
         assert_eq!(result.country_code, "ES");
         assert_eq!(result.control, 91);
@@ -75,7 +84,15 @@ mod tests {
     fn iban_should_be_valid() {
         let account = VALID_IBAN.into();
 
-        assert!(is_iban_valid(&account).unwrap());
+        assert!(is_iban_valid(&account).is_ok());
+    }
+
+    #[test]
+    #[should_panic]
+    fn iban_should_fail() {
+        let account = "ES0121000418123456789012".into();
+
+        is_iban_valid(&account).expect("IBAN is invalid");
     }
 
     #[test]

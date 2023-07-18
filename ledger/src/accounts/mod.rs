@@ -1,6 +1,30 @@
+pub trait AccountRepository {
+    fn get_next_account_number(&self, branch: u16) -> u32;
+}
+
+pub struct AccountService {
+    repository: Box<dyn AccountRepository>,
+}
+
 pub enum AccountNumber {
     Bban { branch: u16, number: u32 },
     Invalid(String),
+}
+
+pub struct AccountNumberError;
+
+impl AccountService {
+    fn new(repository: Box<dyn AccountRepository>) -> AccountService {
+        AccountService { repository }
+    }
+
+    fn create_account_number(&self, branch: u16) -> AccountNumber {
+        AccountNumber::Invalid("failed to create account".to_owned())
+    }
+}
+
+fn new_account_number_for_branch(branch: u16) -> Result<u32, AccountNumberError> {
+    todo!()
 }
 
 impl From<&str> for AccountNumber {
